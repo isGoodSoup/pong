@@ -8,10 +8,13 @@ FPS = 60
 SCREEN_SIZE = pygame.display.Info().current_w, pygame.display.Info().current_h
 COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
+COLOR_LIGHT_BLUE = (173, 216, 230)
 CENTER = SCREEN_SIZE[0] // 2, SCREEN_SIZE[1] // 2
 START_Y = SCREEN_SIZE[1] // 2
 OFFSET = 100
+PADDLE_SPEED = 16
 pygame.mouse.set_visible(False)
+
 
 def resource_path(path):
     if hasattr(sys, "_MEIPASS"):
@@ -20,21 +23,38 @@ def resource_path(path):
         absolute_path = os.path.join(path)
     return absolute_path
 
+
 def _play_(sound):
     sound.play()
 
+
 sounds = [
-    pygame.mixer.Sound(resource_path("assets/fx/hit.ogg")),
+    pygame.mixer.Sound(
+        resource_path("assets/fx/hit.ogg")),
 ]
 
 for sound in sounds:
     sound.set_volume(0.8)
 
+
+def draw_checkerboard(screen, tile_size=60):
+    color1 = COLOR_WHITE
+    color2 = COLOR_LIGHT_BLUE
+
+    for y in range(0, SCREEN_SIZE[1], tile_size):
+        for x in range(0, SCREEN_SIZE[0], tile_size):
+            if (x // tile_size + y // tile_size) % 2 == 0:
+                color = color1
+            else:
+                color = color2
+            pygame.draw.rect(screen, color, (x, y, tile_size, tile_size))
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((20, 100))
+        self.image = pygame.Surface((20, 100), pygame.SRCALPHA)
         self.image.fill(COLOR_WHITE)
+        pygame.draw.rect(self.image, COLOR_BLACK, self.image.get_rect(), 2)
         self.rect = self.image.get_rect(center=(x, y))
         self.score = 0
 
@@ -47,14 +67,15 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         self.clamp_paddle()
 
+
 class Ball(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         self.image = pygame.Surface((20, 20), pygame.SRCALPHA)
         pygame.draw.circle(self.image, COLOR_WHITE, (10, 10), 10)
-
+        pygame.draw.circle(self.image, COLOR_BLACK, (10, 10), 10, 2)
         self.rect = self.image.get_rect(center=(x, y))
-        self.speed = 15
+        self.speed = PADDLE_SPEED
         self.dx = self.dy = self.speed
 
     def update(self):
@@ -65,21 +86,37 @@ class Ball(pygame.sprite.Sprite):
             self.dy *= -1
             _play_(sounds[0])
 
+
 class Score:
     def __init__(self):
-        self.font = pygame.font.Font(None, 36)
+        self.font = pygame.font.Font(
+            resource_path("assets/ui/Monocraft_Semibold.ttf"), 36)
 
     def draw(self, screen, p1, p2):
         text = f"{p1.score}  |  {p2.score}"
-        render = self.font.render(text, True, COLOR_WHITE)
-        screen.blit(render, (SCREEN_SIZE[0] // 2 - render.get_width() // 2, 100))
+        base = self.font.render(text, True, COLOR_WHITE)
+        outline = self.font.render(text, True, COLOR_BLACK)
+
+        x = SCREEN_SIZE[0] // 2 - base.get_width() // 2
+        y = 120
+
+        thickness = 2
+        for dx in range(-thickness, thickness + 1):
+            for dy in range(-thickness, thickness + 1):
+                if dx == 0 and dy == 0:
+                    continue
+                screen.blit(outline, (x + dx, y + dy))
+
+        screen.blit(base, (x, y))
+
 
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode(SCREEN_SIZE, vsync=1)
         self.clock = pygame.time.Clock()
         self.running = True
-
+        self.background = pygame.Surface(SCREEN_SIZE)
+        draw_checkerboard(self.background)
         pygame.display.set_caption("Pong")
 
         self.player1 = Player(OFFSET, START_Y)
@@ -87,7 +124,7 @@ class Game:
         self.ball = pygame.sprite.GroupSingle(Ball(*CENTER))
 
         self.players = pygame.sprite.Group(self.player1, self.player2)
-        self.speed = 15
+        self.speed = PADDLE_SPEED + 5
 
         self.score = Score()
 
@@ -142,7 +179,7 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            self.screen.fill(COLOR_BLACK)
+            self.screen.blit(self.background, (0, 0))
             self.clock.tick(FPS)
             self._input_()
 
